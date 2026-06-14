@@ -1,0 +1,628 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nginx-Aegis 智能诊断配置系统 - Jquan 亮色艺术版</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="dist/core/JquanUI@Core.js"></script>
+    <script src="dist/components/JquanUI@components.js"></script>
+    <!-- FontAwesome 字体图标 -->
+    <link href="https://cdn.bootcdn.net/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    
+    <!-- UI 核心配置 -->
+    <script src="js/jquan-config.js"></script>
+
+    <!-- UI样式 -->
+    <link href="css/app.css" rel="stylesheet">
+</head>
+<body class="bg-slate-50 min-h-screen text-slate-800 font-sans antialiased">
+
+    <!-- 顶部导航栏 -->
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-seasalt flex items-center justify-center shadow-md">
+                    <i class="fa-solid fa-wand-magic-sparkles text-white text-xl animate-pulse"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold tracking-tight text-seasalt">Nginx-Aegis</h1>
+                    <p class="text-xs text-gray-500 font-medium">智能零基础诊断配置系统 v1.4.5</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-4">
+                <a href="#recipes" class="text-sm font-semibold text-slate-600 hover:text-seasalt transition-all">预置场景方案</a>
+                <a href="#analyzer" class="text-sm font-semibold text-slate-600 hover:text-seasalt transition-all">安全诊断</a>
+                <span class="h-4 w-px bg-slate-200"></span>
+                <span class="text-xs bg-emerald-50 text-emerald-600 font-semibold px-2.5 py-1 rounded-full flex items-center gap-1 border border-emerald-200">
+                    <span class="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-ping"></span> JquanUI V3.2
+                </span>
+            </div>
+        </div>
+    </header>
+
+    <!-- 核心主体区 -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        
+        <!-- 首屏：状态及导入 -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+            <!-- 诊断仪表盘 -->
+            <div class="lg:col-span-2 bg-white rounded-2xl border border-slate-200 p-6 flex flex-col md:flex-row items-center gap-6 shadow-sm">
+                <!-- 环形计分面板 -->
+                <div class="relative flex-shrink-0 w-32 h-32 flex items-center justify-center">
+                    <svg class="w-full h-full transform -rotate-90">
+                        <circle cx="64" cy="64" r="56" stroke="#f1f5f9" stroke-width="10" fill="transparent" />
+                        <circle id="scoreRing" cx="64" cy="64" r="56" stroke="url(#magicGrad)" stroke-width="10" fill="transparent" 
+                                stroke-dasharray="351.8" stroke-dashoffset="351.8" class="transition-all duration-700 ease-out" />
+                        <defs>
+                            <linearGradient id="magicGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" stop-color="#25aae1" />
+                                <stop offset="100%" stop-color="#2bb673" />
+                            </linearGradient>
+                        </defs>
+                    </svg>
+                    <div class="absolute flex flex-col items-center">
+                        <span id="scoreText" class="text-3xl font-extrabold text-slate-800">100</span>
+                        <span class="text-[10px] text-slate-400 font-bold uppercase tracking-widest">配置安全分</span>
+                    </div>
+                </div>
+
+                <div class="flex-1 text-center md:text-left">
+                    <h3 class="text-lg font-bold text-slate-800 flex items-center justify-center md:justify-start gap-2">
+                        <span>智能配置体检引擎</span>
+                        <span id="scoreBadge" class="text-xs px-2 py-0.5 rounded-md font-bold bg-emerald-50 text-emerald-600 border border-emerald-100">配置极佳</span>
+                    </h3>
+                    <p class="text-sm text-slate-500 mt-1">
+                        实时扫描安全隐患：包含防恶意IP扫站探测、SSL加密缺陷、跨站攻击Header缺失及Gzip等关键调优参数。
+                    </p>
+                    <div class="mt-4 flex flex-wrap justify-center md:justify-start gap-2">
+                        <button onclick="diagnoseCurrentConfig()" class="text-xs font-bold px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors flex items-center gap-1.5 text-slate-700">
+                            <i class="fa-solid fa-rotate text-emerald-500"></i> 立即扫描诊断
+                        </button>
+                        <button onclick="resetToEmpty()" class="text-xs font-bold px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg transition-colors">
+                            重置为空白模板
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 数据初始化导入 -->
+            <div class="bg-white rounded-2xl border border-slate-200 p-6 flex flex-col justify-between shadow-sm">
+                <div>
+                    <h3 class="text-base font-bold text-slate-800 flex items-center gap-1.5">
+                        <i class="fa-solid fa-upload text-sky-500"></i> 导入已有配置
+                    </h3>
+                    <p class="text-xs text-slate-400 mt-1">支持导入宝塔面板或自定义原始 Nginx Server 配置段，导入后可直接对其进行安全扫描与在线加固。</p>
+                </div>
+                <div class="mt-3 space-y-2">
+                    <textarea id="importArea" rows="3" class="w-full text-xs font-mono p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none transition-all placeholder:text-slate-400" placeholder="在此粘贴您的 Nginx server {...} 原始代码段..."></textarea>
+                    <button onclick="importNginxConf()" class="w-full bg-seasalt font-bold text-xs py-2 px-4 rounded-xl shadow-sm transition-transform active:scale-95 text-center">
+                        开始解析并诊断
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 双栏工作区 -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            
+            <!-- 左侧：方案区 & 表单精细配置区 (7 Cols) -->
+            <div class="lg:col-span-7 space-y-8">
+                
+                <!-- 预置一键高频方案库 -->
+                <div id="recipes" class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+                    <div class="flex items-center justify-between border-b border-slate-100 pb-4 mb-4">
+                        <div>
+                            <h3 class="text-base font-bold text-slate-800 flex items-center gap-2">
+                                <i class="fa-solid fa-wand-magic-sparkles text-emerald-500"></i>
+                                <span>一键应用高级套餐</span>
+                            </h3>
+                            <p class="text-xs text-gray-400 mt-0.5">极客定制安全防线，杜绝任何扫描器与恶意探测</p>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <!-- 痛点1: 恶意IP直接访问 -->
+                        <div class="service-card p-4 flex flex-col justify-between">
+                            <div>
+                                <div class="flex items-center gap-2 mb-2">
+                                    <span class="w-8 h-8 rounded-lg bg-rose-50 flex items-center justify-center text-rose-500">
+                                        <i class="fa-solid fa-ban"></i>
+                                    </span>
+                                    <h4 class="font-bold text-xs text-slate-800">屏蔽 IP 恶意访问 / 扫站</h4>
+                                </div>
+                                <p class="text-[11px] text-slate-500 leading-relaxed">
+                                    黑客通过 <code class="text-rose-500 bg-rose-50 px-1 rounded">https://ip:443</code> 恶意连接？开启此项直接抛弃未绑定域名的恶意请求，直接返回 444 状态码。
+                                </p>
+                            </div>
+                            <div class="mt-4 flex items-center justify-between">
+                                <span class="text-[10px] bg-rose-50 text-rose-600 font-bold px-1.5 py-0.5 rounded">网络安全推荐</span>
+                                <div class="flex items-center gap-1.5">
+                                    <span class="text-xs text-slate-400">启用</span>
+                                    <input type="checkbox" id="blockIpDirect" onchange="toggleRecipe('blockIpDirect')" class="jq-switch">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 痛点2: SPA 页面刷新 404 -->
+                        <div class="service-card p-4 flex flex-col justify-between">
+                            <div>
+                                <div class="flex items-center gap-2 mb-2">
+                                    <span class="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-500">
+                                        <i class="fa-solid fa-arrows-split-up-and-left"></i>
+                                    </span>
+                                    <h4 class="font-bold text-xs text-slate-800">SPA单页面路由 404 修复</h4>
+                                </div>
+                                <p class="text-[11px] text-slate-500 leading-relaxed">
+                                    React/Vue 等项目部署后，刷新页面直接报 404？一键配置前端路由回退策略（`try_files` 兜底指向 `index.html`）。
+                                </p>
+                            </div>
+                            <div class="mt-4 flex items-center justify-between">
+                                <span class="text-[10px] bg-indigo-50 text-indigo-600 font-bold px-1.5 py-0.5 rounded">前端必备</span>
+                                <div class="flex items-center gap-1.5">
+                                    <span class="text-xs text-slate-400">启用</span>
+                                    <input type="checkbox" id="spaRouting" onchange="toggleRecipe('spaRouting')" class="jq-switch">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 痛点3: CORS 跨域全解 -->
+                        <div class="service-card p-4 flex flex-col justify-between">
+                            <div>
+                                <div class="flex items-center gap-2 mb-2">
+                                    <span class="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
+                                        <i class="fa-solid fa-shuffle"></i>
+                                    </span>
+                                    <h4 class="font-bold text-xs text-slate-800">CORS 跨域全开透传</h4>
+                                </div>
+                                <p class="text-[11px] text-slate-500 leading-relaxed">
+                                    跨域报错（Access-Control-Allow-Origin）？一键向 API 路径下添加标准跨域协商及预检（OPTIONS）拦截机制。
+                                </p>
+                            </div>
+                            <div class="mt-4 flex items-center justify-between">
+                                <span class="text-[10px] bg-emerald-50 text-emerald-600 font-bold px-1.5 py-0.5 rounded">联调常用</span>
+                                <div class="flex items-center gap-1.5">
+                                    <span class="text-xs text-slate-400">启用</span>
+                                    <input type="checkbox" id="corsEnable" onchange="toggleRecipe('corsEnable')" class="jq-switch">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 痛点4: 安全 Header 加固 -->
+                        <div class="service-card p-4 flex flex-col justify-between">
+                            <div>
+                                <div class="flex items-center gap-2 mb-2">
+                                    <span class="w-8 h-8 rounded-lg bg-sky-50 flex items-center justify-center text-sky-600">
+                                        <i class="fa-solid fa-user-shield"></i>
+                                    </span>
+                                    <h4 class="font-bold text-xs text-slate-800">安全盾 Headers 增强套件</h4>
+                                </div>
+                                <p class="text-[11px] text-slate-500 leading-relaxed">
+                                    拦截劫持，防止网页被恶意 iframe 嵌套，强制开启浏览器内置 XSS 深度安全过滤。
+                                </p>
+                            </div>
+                            <div class="mt-4 flex items-center justify-between">
+                                <span class="text-[10px] bg-sky-50 text-sky-600 font-bold px-1.5 py-0.5 rounded">加固推荐</span>
+                                <div class="flex items-center gap-1.5">
+                                    <span class="text-xs text-slate-400">启用</span>
+                                    <input type="checkbox" id="securityHeaders" onchange="toggleRecipe('securityHeaders')" class="jq-switch">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 套餐5: 现代 SSL 加固 -->
+                        <div class="service-card p-4 flex flex-col justify-between">
+                            <div>
+                                <div class="flex items-center gap-2 mb-2">
+                                    <span class="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center text-amber-600">
+                                        <i class="fa-solid fa-lock"></i>
+                                    </span>
+                                    <h4 class="font-bold text-xs text-slate-800">现代 SSL 加固套件</h4>
+                                </div>
+                                <p class="text-[11px] text-slate-500 leading-relaxed">
+                                    自动禁用 TLS 1.0/1.1 与 3DES，关闭 Session Tickets，提升 HTTPS 安全基线。
+                                </p>
+                            </div>
+                            <div class="mt-4 flex items-center justify-between">
+                                <span class="text-[10px] bg-amber-50 text-amber-600 font-bold px-1.5 py-0.5 rounded">HTTPS 推荐</span>
+                                <div class="flex items-center gap-1.5">
+                                    <span class="text-xs text-slate-400">启用</span>
+                                    <input type="checkbox" id="modernSsl" onchange="toggleRecipe('modernSsl')" class="jq-switch">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 套餐6: PHP 安全 -->
+                        <div class="service-card p-4 flex flex-col justify-between">
+                            <div>
+                                <div class="flex items-center gap-2 mb-2">
+                                    <span class="w-8 h-8 rounded-lg bg-purple-50 flex items-center justify-center text-purple-600">
+                                        <i class="fa-solid fa-code"></i>
+                                    </span>
+                                    <h4 class="font-bold text-xs text-slate-800">PHP 站点安全套件</h4>
+                                </div>
+                                <p class="text-[11px] text-slate-500 leading-relaxed">
+                                    阻止 uploads 等目录执行 PHP，减少木马上传后被直接执行的风险。
+                                </p>
+                            </div>
+                            <div class="mt-4 flex items-center justify-between">
+                                <span class="text-[10px] bg-purple-50 text-purple-600 font-bold px-1.5 py-0.5 rounded">PHP 必备</span>
+                                <div class="flex items-center gap-1.5">
+                                    <span class="text-xs text-slate-400">启用</span>
+                                    <input type="checkbox" id="phpSecurity" onchange="toggleRecipe('phpSecurity')" class="jq-switch">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 套餐7: WebSocket 加固 -->
+                        <div class="service-card p-4 flex flex-col justify-between">
+                            <div>
+                                <div class="flex items-center gap-2 mb-2">
+                                    <span class="w-8 h-8 rounded-lg bg-cyan-50 flex items-center justify-center text-cyan-600">
+                                        <i class="fa-solid fa-plug-circle-bolt"></i>
+                                    </span>
+                                    <h4 class="font-bold text-xs text-slate-800">WebSocket 代理加固</h4>
+                                </div>
+                                <p class="text-[11px] text-slate-500 leading-relaxed">
+                                    补齐 WSS 反代常用头、连接超时与关闭缓存设置，减少断连和握手异常。
+                                </p>
+                            </div>
+                            <div class="mt-4 flex items-center justify-between">
+                                <span class="text-[10px] bg-cyan-50 text-cyan-600 font-bold px-1.5 py-0.5 rounded">实时服务</span>
+                                <div class="flex items-center gap-1.5">
+                                    <span class="text-xs text-slate-400">启用</span>
+                                    <input type="checkbox" id="websocketHardening" onchange="toggleRecipe('websocketHardening')" class="jq-switch">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 套餐8: 防盗链 -->
+                        <div class="service-card p-4 flex flex-col justify-between">
+                            <div>
+                                <div class="flex items-center gap-2 mb-2">
+                                    <span class="w-8 h-8 rounded-lg bg-lime-50 flex items-center justify-center text-lime-700">
+                                        <i class="fa-solid fa-link-slash"></i>
+                                    </span>
+                                    <h4 class="font-bold text-xs text-slate-800">图片资源防盗链</h4>
+                                </div>
+                                <p class="text-[11px] text-slate-500 leading-relaxed">
+                                    限制图片等资源被外站直接引用，降低带宽被盗刷的概率。
+                                </p>
+                            </div>
+                            <div class="mt-4 flex items-center justify-between">
+                                <span class="text-[10px] bg-lime-50 text-lime-700 font-bold px-1.5 py-0.5 rounded">带宽保护</span>
+                                <div class="flex items-center gap-1.5">
+                                    <span class="text-xs text-slate-400">启用</span>
+                                    <input type="checkbox" id="hotlinkProtection" onchange="toggleRecipe('hotlinkProtection')" class="jq-switch">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 套餐9: CC 限流 -->
+                        <div class="service-card p-4 flex flex-col justify-between">
+                            <div>
+                                <div class="flex items-center gap-2 mb-2">
+                                    <span class="w-8 h-8 rounded-lg bg-rose-50 flex items-center justify-center text-rose-600">
+                                        <i class="fa-solid fa-shield-halved"></i>
+                                    </span>
+                                    <h4 class="font-bold text-xs text-slate-800">一键防 CC 频率限流</h4>
+                                </div>
+                                <p class="text-[11px] text-slate-500 leading-relaxed">
+                                    基于客户端 IP 建立请求频率阈值，削弱恶意高频刷新、接口刷量与轻量 CC 压力。
+                                </p>
+                            </div>
+                            <div class="mt-4 flex items-center justify-between">
+                                <span class="text-[10px] bg-rose-50 text-rose-600 font-bold px-1.5 py-0.5 rounded">抗压防护</span>
+                                <div class="flex items-center gap-1.5">
+                                    <span class="text-xs text-slate-400">启用</span>
+                                    <input type="checkbox" id="ccRateLimit" onchange="toggleRecipe('ccRateLimit')" class="jq-switch">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 套餐10: 反向代理 -->
+                        <div class="service-card p-4 flex flex-col justify-between">
+                            <div>
+                                <div class="flex items-center gap-2 mb-2">
+                                    <span class="w-8 h-8 rounded-lg bg-teal-50 flex items-center justify-center text-teal-600">
+                                        <i class="fa-solid fa-route"></i>
+                                    </span>
+                                    <h4 class="font-bold text-xs text-slate-800">反向代理负载均衡映射</h4>
+                                </div>
+                                <p class="text-[11px] text-slate-500 leading-relaxed">
+                                    为 Node、Java、Go、Python 或 Docker 服务生成标准代理头，完整配置模式附带 upstream。
+                                </p>
+                            </div>
+                            <div class="mt-4 flex items-center justify-between">
+                                <span class="text-[10px] bg-teal-50 text-teal-600 font-bold px-1.5 py-0.5 rounded">后端服务</span>
+                                <div class="flex items-center gap-1.5">
+                                    <span class="text-xs text-slate-400">启用</span>
+                                    <input type="checkbox" id="reverseProxy" onchange="toggleRecipe('reverseProxy')" class="jq-switch">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 实时诊断面板 -->
+                <div id="analyzer" class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+                    <div class="flex items-center justify-between mb-4 border-b border-slate-100 pb-3">
+                        <h3 class="text-base font-bold text-slate-800 flex items-center gap-2">
+                            <i class="fa-solid fa-stethoscope text-cyan-500"></i>
+                            <span>诊断中心实时报告</span>
+                        </h3>
+                        <span id="issueCount" class="text-xs bg-rose-50 text-rose-500 px-2 py-0.5 rounded font-bold">待扫描</span>
+                    </div>
+
+                    <div id="diagnosticsList" class="space-y-3">
+                        <!-- 智能动态渲染 -->
+                    </div>
+                </div>
+
+                <!-- 可视化精细配置 -->
+                <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+                    <h3 class="text-base font-bold text-slate-800 flex items-center gap-2 border-b border-slate-100 pb-4 mb-4">
+                        <i class="fa-solid fa-sliders text-emerald-500"></i>
+                        <span>基础参数精细配置</span>
+                    </h3>
+
+                    <div class="space-y-5">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 mb-1.5">监听端口</label>
+                                <div class="flex gap-2">
+                                    <input type="text" id="cfgListenPort" oninput="updateConfigField('listen', this.value)" class="flex-1 text-sm bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none" value="80">
+                                    <div class="flex items-center gap-1.5 bg-slate-100 px-2.5 rounded-xl border border-slate-200">
+                                        <input type="checkbox" id="cfgSslCheck" onchange="toggleSsl(this.checked)" class="rounded text-emerald-500 focus:ring-emerald-500">
+                                        <label for="cfgSslCheck" class="text-xs font-bold text-slate-600 cursor-pointer">SSL</label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 mb-1.5">网站域名 (server_name)</label>
+                                <input type="text" id="cfgServerName" oninput="updateConfigField('server_name', this.value)" class="w-full text-sm bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none" value="yourdomain.com">
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 mb-1.5">网站根目录路径 (root)</label>
+                                <input type="text" id="cfgRootPath" oninput="updateConfigField('root', this.value)" class="w-full text-sm font-mono bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none" value="/www/wwwroot/your_project">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 mb-1.5">默认首页 (index)</label>
+                                <input type="text" id="cfgIndexFiles" oninput="updateConfigField('index', this.value)" class="w-full text-sm font-mono bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none" value="index.html index.htm default.html">
+                            </div>
+                        </div>
+
+                        <!-- SSL 安全子配置面板 -->
+                        <div id="sslSection" class="hidden border border-emerald-100 bg-emerald-50/20 rounded-xl p-4 space-y-3">
+                            <h4 class="text-xs font-bold text-emerald-700 flex items-center gap-1">
+                                <i class="fa-solid fa-lock"></i> HTTPS 证书绑定及加固
+                            </h4>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-[11px] font-bold text-slate-600 mb-1">.pem 证书文件路径</label>
+                                    <input type="text" id="cfgSslCert" oninput="updateConfigField('ssl_certificate', this.value)" class="w-full text-xs font-mono bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none" value="/etc/nginx/ssl/yourdomain.crt">
+                                </div>
+                                <div>
+                                    <label class="block text-[11px] font-bold text-slate-600 mb-1">.key 密钥文件路径</label>
+                                    <input type="text" id="cfgSslKey" oninput="updateConfigField('ssl_certificate_key', this.value)" class="w-full text-xs font-mono bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none" value="/etc/nginx/ssl/yourdomain.key">
+                                </div>
+                            </div>
+                            <div class="flex items-center justify-between pt-1.5 border-t border-emerald-100/50">
+                                <span class="text-xs text-slate-600 font-bold">强制跳转 HTTPS (HTTP -> 301 重定向)</span>
+                                <input type="checkbox" id="cfgForceHttps" onchange="updateConfigField('force_https', this.checked)" class="jq-switch">
+                            </div>
+                        </div>
+
+                        <!-- 生产性能调优细节 -->
+                        <div class="border-t border-slate-100 pt-5">
+                            <h4 class="text-xs font-bold text-slate-700 mb-3 flex items-center gap-1">
+                                <i class="fa-solid fa-bolt text-amber-500"></i> Nginx 核心调优阀门
+                            </h4>
+                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 flex flex-col justify-between">
+                                    <div>
+                                        <span class="text-xs font-bold text-slate-700 block">开启 Gzip 压缩</span>
+                                        <span class="text-[10px] text-gray-400">大幅压缩静态文本网络传输体积</span>
+                                    </div>
+                                    <div class="mt-2 flex items-center justify-between">
+                                        <span id="gzipStatus" class="text-[10px] font-bold text-emerald-500">启用</span>
+                                        <input type="checkbox" id="cfgGzip" onchange="updateConfigField('gzip', this.checked)" checked class="jq-switch">
+                                    </div>
+                                </div>
+
+                                <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 flex flex-col justify-between">
+                                    <div>
+                                        <span class="text-xs font-bold text-slate-700 block">静态资源强制强缓存</span>
+                                        <span class="text-[10px] text-gray-400">资源本地存储30天，减少请求开销</span>
+                                    </div>
+                                    <div class="mt-2 flex items-center justify-between">
+                                        <span id="cacheStatus" class="text-[10px] font-bold text-emerald-500">启用</span>
+                                        <input type="checkbox" id="cfgStaticCache" onchange="updateConfigField('static_cache', this.checked)" checked class="jq-switch">
+                                    </div>
+                                </div>
+
+                                <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 flex flex-col justify-between">
+                                    <div>
+                                        <span class="text-xs font-bold text-slate-700 block">隐藏 Nginx 版本号</span>
+                                        <span class="text-[10px] text-gray-400">屏蔽具体服务细节，规避安全扫描</span>
+                                    </div>
+                                    <div class="mt-2 flex items-center justify-between">
+                                        <span id="hideVersionStatus" class="text-[10px] font-bold text-emerald-500">启用</span>
+                                        <input type="checkbox" id="cfgHideVersion" onchange="updateConfigField('hide_nginx_version', this.checked)" checked class="jq-switch">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 高级套餐参数 -->
+                        <div id="advancedRecipeSettings" class="hidden border-t border-slate-100 pt-5 space-y-4">
+                            <h4 class="text-xs font-bold text-slate-700 flex items-center gap-1">
+                                <i class="fa-solid fa-screwdriver-wrench text-teal-500"></i> 高级套餐参数
+                            </h4>
+
+                            <div id="proxySettingsPanel" class="hidden border border-teal-100 bg-teal-50/20 rounded-xl p-4 space-y-3">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-xs font-bold text-teal-700">反向代理 / 后端服务</span>
+                                    <span class="text-[10px] text-teal-600 font-bold bg-white border border-teal-100 px-2 py-0.5 rounded">需要填写真实服务</span>
+                                </div>
+                                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                    <div>
+                                        <label class="block text-[11px] font-bold text-slate-600 mb-1">访问路径</label>
+                                        <input type="text" id="cfgProxyPath" oninput="updateConfigField('proxyPath', this.value)" class="w-full text-xs font-mono bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 outline-none" value="/api/">
+                                    </div>
+                                    <div class="md:col-span-2">
+                                        <label class="block text-[11px] font-bold text-slate-600 mb-1">后端地址（IP/域名 + 端口）</label>
+                                        <input type="text" id="cfgProxyTarget" oninput="updateConfigField('proxyTarget', this.value)" class="w-full text-xs font-mono bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 outline-none" value="http://127.0.0.1:3000">
+                                    </div>
+                                </div>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    <div>
+                                        <label class="block text-[11px] font-bold text-slate-600 mb-1">Upstream 名称</label>
+                                        <input type="text" id="cfgUpstreamName" oninput="updateConfigField('upstreamName', this.value)" class="w-full text-xs font-mono bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 outline-none" value="aegis_backend">
+                                    </div>
+                                    <div>
+                                        <label class="block text-[11px] font-bold text-slate-600 mb-1">CORS 允许来源</label>
+                                        <input type="text" id="cfgCorsOrigin" oninput="updateConfigField('corsAllowedOrigin', this.value)" class="w-full text-xs font-mono bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 outline-none" value="*">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div id="rateLimitSettingsPanel" class="hidden border border-rose-100 bg-rose-50/20 rounded-xl p-4 space-y-3">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-xs font-bold text-rose-700">CC / 频率限流</span>
+                                    <span class="text-[10px] text-rose-600 font-bold bg-white border border-rose-100 px-2 py-0.5 rounded">按业务承载调整</span>
+                                </div>
+                                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                    <div>
+                                        <label class="block text-[11px] font-bold text-slate-600 mb-1">限流区名称</label>
+                                        <input type="text" id="cfgRateLimitZone" oninput="updateConfigField('rateLimitZone', this.value)" class="w-full text-xs font-mono bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 focus:border-rose-500 focus:ring-1 focus:ring-rose-500 outline-none" value="aegis_cc">
+                                    </div>
+                                    <div>
+                                        <label class="block text-[11px] font-bold text-slate-600 mb-1">每 IP 频率</label>
+                                        <input type="text" id="cfgRateLimitRate" oninput="updateConfigField('rateLimitRate', this.value)" class="w-full text-xs font-mono bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 focus:border-rose-500 focus:ring-1 focus:ring-rose-500 outline-none" value="10r/s">
+                                    </div>
+                                    <div>
+                                        <label class="block text-[11px] font-bold text-slate-600 mb-1">突发队列 burst</label>
+                                        <input type="number" min="0" id="cfgRateLimitBurst" oninput="updateConfigField('rateLimitBurst', this.value)" class="w-full text-xs font-mono bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 focus:border-rose-500 focus:ring-1 focus:ring-rose-500 outline-none" value="20">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div id="hotlinkSettingsPanel" class="hidden border border-lime-100 bg-lime-50/20 rounded-xl p-4">
+                                <label class="block text-[11px] font-bold text-slate-600 mb-1">防盗链允许域名</label>
+                                <input type="text" id="cfgHotlinkDomains" oninput="updateConfigField('hotlinkDomains', this.value)" class="w-full text-xs font-mono bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 focus:border-lime-500 focus:ring-1 focus:ring-lime-500 outline-none" value="">
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- 右侧：像素级复刻 codeBlock.js 极致亮色代码区 (5 Cols) -->
+            <div class="lg:col-span-5 lg:sticky lg:top-24 space-y-4">
+                
+                <!-- 【完美复刻】codeBlock 容器 -->
+                <div class="code-shell relative my-4 overflow-hidden rounded-xl bg-white text-slate-700 shadow-sm transition-all hover:shadow-md">
+                    
+                    <!-- 顶端小操作区，mac 质感灰色极简标签 -->
+                    <div class="flex items-center justify-between bg-slate-50/50 px-4 py-2.5 border-b border-slate-100">
+                        <div class="flex items-center gap-1.5">
+                            <span class="w-2.5 h-2.5 rounded-full bg-slate-300"></span>
+                            <span class="w-2.5 h-2.5 rounded-full bg-slate-300"></span>
+                            <span class="w-2.5 h-2.5 rounded-full bg-slate-300"></span>
+                            <span class="text-[11px] font-mono text-slate-500 ml-2 font-semibold">nginx.conf 生产配置</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <div id="exportScopeControl" class="hidden items-center gap-1 rounded border border-slate-200 bg-white p-0.5">
+                                <button id="scopeServerBtn" onclick="setExportScope('server')" class="text-[10px] px-2 py-1 rounded font-bold text-white bg-slate-900">站点片段</button>
+                                <button id="scopeFullBtn" onclick="setExportScope('full')" class="text-[10px] px-2 py-1 rounded font-bold text-slate-500 hover:text-slate-800">完整配置</button>
+                            </div>
+                            <!-- 导出配置文件 -->
+                            <button onclick="downloadConfFile()" class="text-[11px] text-slate-500 hover:text-slate-800 px-2 py-1 rounded border border-slate-200 bg-white hover:bg-slate-50 transition-all font-semibold flex items-center gap-1">
+                                <i class="fa-solid fa-download"></i> 导出配置文件
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- JquanUI CodeBlock 官方组件渲染区 -->
+                    <div jq-code-host>
+                        <pre id="nginxCodeBlock" class="m-0"><code id="codeOutput" class="language-nginx"></code></pre>
+                    </div>
+
+                </div>
+
+                <!-- 导出风险摘要 -->
+                <div id="exportInsightPanel" class="bg-white border border-slate-200 rounded-xl p-4 text-xs shadow-sm">
+                    <div class="flex items-center justify-between mb-3">
+                        <h4 class="font-bold text-slate-800 flex items-center gap-1.5">
+                            <i class="fa-solid fa-clipboard-check text-emerald-500"></i> 复制前校验
+                        </h4>
+                        <span id="exportModeBadge" class="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-600">完整配置</span>
+                    </div>
+                    <div class="grid grid-cols-1 gap-2">
+                        <div>
+                            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">改动摘要</span>
+                            <ul id="changeSummaryList" class="mt-1 space-y-1 text-slate-600"></ul>
+                        </div>
+                        <div class="border-t border-slate-100 pt-2">
+                            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">部署风险</span>
+                            <ul id="riskSummaryList" class="mt-1 space-y-1 text-slate-600"></ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- nginx -t 报错解释器 -->
+                <div class="bg-white border border-slate-200 rounded-xl p-4 text-xs shadow-sm">
+                    <div class="flex items-center justify-between mb-3">
+                        <h4 class="font-bold text-slate-800 flex items-center gap-1.5">
+                            <i class="fa-solid fa-terminal text-slate-700"></i> nginx -t 报错解释器
+                        </h4>
+                        <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-500">粘贴终端输出</span>
+                    </div>
+                    <textarea id="nginxErrorInput" rows="4" class="w-full text-xs font-mono p-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none placeholder:text-slate-400" placeholder="例如：nginx: [emerg] duplicate default server for 0.0.0.0:80 in /www/server/panel/vhost/nginx/example.conf:3"></textarea>
+                    <button onclick="explainNginxError()" class="mt-2 w-full text-[11px] font-bold px-3 py-2 rounded-lg bg-slate-900 text-white hover:bg-slate-800 transition-colors">
+                        解释报错并给出修复建议
+                    </button>
+                    <ul id="nginxErrorExplainList" class="mt-3 space-y-2 text-slate-600"></ul>
+                </div>
+
+                <!-- 小白指南贴士 -->
+                <div class="bg-blue-50/50 border border-blue-100 rounded-xl p-4 text-blue-900 text-xs flex gap-2.5 shadow-sm">
+                    <i class="fa-solid fa-info text-blue-500 text-sm mt-0.5"></i>
+                    <div>
+                        <strong class="font-bold">服务器一键部署引导：</strong>
+                        <p id="deployGuideText" class="mt-0.5 leading-relaxed text-blue-700">
+                            导入宝塔站点配置后，右侧默认输出可粘回站点 vhost 的 server 级片段。复制前请确认部署位置，保存后先执行 <code class="bg-slate-950 text-white font-mono px-1 rounded text-[10px]">nginx -t</code>，通过后再 reload。
+                        </p>
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+
+    </main>
+
+    <footer class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-8 -mt-2">
+        <div class="border-t border-slate-200 pt-4 text-center text-xs text-slate-500">
+            本项目前端由
+            <a href="https://cssui.jquan.win/" target="_blank" rel="noopener noreferrer" class="font-bold text-emerald-600 hover:text-emerald-700 transition-colors">JquanUI V3.2</a>
+            驱动
+        </div>
+    </footer>
+
+    <!-- 底部通知 Toast -->
+    <div id="toast" class="fixed bottom-6 right-6 z-50 bg-slate-950 text-white text-xs px-4 py-3 rounded-xl shadow-2xl flex items-center gap-2 transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none border border-slate-800">
+        <i class="fa-solid fa-circle-check text-emerald-400 text-base"></i>
+        <span id="toastMsg">复制成功，赶紧去部署吧！</span>
+    </div>
+
+    <!-- 核心响应式编译及检测引擎 -->
+    <script src="js/app.js"></script>
+</body>
+</html>
